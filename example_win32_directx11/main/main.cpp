@@ -67,7 +67,7 @@ std::string url = "https://keyauth.win/api/1.3/";
 
 KeyAuth::api KeyAuthApp(app_name, owner_id, version, url, path);
 
-static bool login = false;
+static bool login = true;
 static int login_tab = 0;
 static char login_username[256] = "";
 static char login_password[256] = "";
