@@ -158,6 +158,12 @@ void move_window()
 
 int APIENTRY WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
 {
+    AllocConsole();
+    FILE *f;
+    freopen_s(&f, "CONOUT$", "w", stdout);
+    freopen_s(&f, "CONOUT$", "w", stderr);
+    std::cout << "[Debug] Console Allocated" << std::endl;
+
     // Charger les offsets au demarrage
     LoadOffsets("config.ini");
 
