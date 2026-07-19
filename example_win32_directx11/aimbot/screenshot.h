@@ -10,19 +10,20 @@ public:
 	cv::Mat& get();
 
 private:
-	HDC m_hWDC;
-	HDC m_hScreen;
-	HBITMAP m_hBitmap;
-	BITMAPINFO m_bitmapinfo;
+	bool captureForegroundWindow();
+	bool captureDesktop();
 
-	int m_width;
-	int m_height;
+	HDC m_hWDC = nullptr;
+	HDC m_hScreen = nullptr;
+	HBITMAP m_hBitmap = nullptr;
+	BITMAPINFO m_bitmapinfo = {};
+	HGDIOBJ m_hGDI_temp = nullptr;
 
-	int m_left;
-	int m_top;
+	int m_width = 0;
+	int m_height = 0;
+	int m_left = 0;
+	int m_top = 0;
 
-	char* m_data;
-	cv::Mat* m_screen;
-
-	HGDIOBJ m_hGDI_temp;
+	char* m_data = nullptr;
+	cv::Mat* m_screen = nullptr;
 };

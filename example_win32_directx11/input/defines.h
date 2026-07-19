@@ -3,6 +3,7 @@
 
 enum InjectedInputMouseOptions
 {
+    move = 1,
     left_up = 4,
     left_down = 2,
     right_up = 8,

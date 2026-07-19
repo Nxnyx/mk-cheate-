@@ -176,13 +176,22 @@
     <ClInclude Include="main\color.h" />
     <ClInclude Include="main\ico_pack.h" />
     <ClInclude Include="main\inter.h" />
-    <ClInclude Include="main\main.h" />
+    <ClInclude Include="main\main.h">
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">false</ExcludedFromBuild>
+    </ClInclude>
     <ClInclude Include="main\user_circle.h" />
     <ClInclude Include="main\xorstr.hpp" />
     <ClInclude Include="main\xorstr1.hpp" />
+    <ClInclude Include="include\security\AntiDebug.hpp" />
+    <ClInclude Include="include\security\StringObfuscator.hpp" />
+    <ClInclude Include="include\security\IntegrityCheck.hpp" />
+    <ClInclude Include="include\security\ThreatResponse.hpp" />
+    <ClInclude Include="include\security\IATObfuscation.hpp" />
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="aimbot\mainA.cpp" />
+    <ClCompile Include="aimbot\mainA.cpp">
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</ExcludedFromBuild>
+    </ClCompile>
     <ClCompile Include="aimbot\mainThread.cpp" />
     <ClCompile Include="aimbot\scanner.cpp" />
     <ClCompile Include="aimbot\screenshot.cpp" />
@@ -194,7 +203,13 @@
     <ClCompile Include="imgui\imgui_tables.cpp" />
     <ClCompile Include="imgui\imgui_widgets.cpp" />
     <ClCompile Include="input\controller.cpp" />
-    <ClCompile Include="main\main.cpp" />
+    <ClCompile Include="main\main.cpp">
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">false</ExcludedFromBuild>
+    </ClCompile>
+    <ClCompile Include="src\security\AntiDebug.cpp" />
+    <ClCompile Include="src\security\IntegrityCheck.cpp" />
+    <ClCompile Include="src\security\ThreatResponse.cpp" />
+    <ClCompile Include="src\security\IATObfuscation.cpp" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

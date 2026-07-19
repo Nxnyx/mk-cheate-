@@ -4,6 +4,8 @@
 #include <tchar.h>
 #include <iostream>
 #include <string>
+#include <vector>
+#include <mutex>
 
 #include "imgui.h"
 #include "imgui_impl_win32.h"
@@ -54,8 +56,8 @@ namespace thread1
 }
 namespace var {
 
-   inline float frequency_factor_x = 0.1; // Ajustez le facteur de fr�quence selon vos pr�f�rences pour le mouvement en x
-    inline float frequency_factor_y = 0.1; // Ajustez le facteur de fr�quence selon vos pr�f�rences pour le mouvement en y
+   inline float frequency_factor_x = 0.1; // Ajustez le facteur de frquence selon vos prfrences pour le mouvement en x
+    inline float frequency_factor_y = 0.1; // Ajustez le facteur de frquence selon vos prfrences pour le mouvement en y
 
 
 
@@ -72,15 +74,58 @@ namespace var {
    inline int Width;
    inline int Height;
     inline bool fovCircle = false;
+    inline float fovSize = 120.0f;
     inline bool checkbox = true;
     inline bool esp = false;
     inline int scannFPS = 100;
     inline float smooth = 30.0f;
     inline float aim_height = 50.0f;
-    inline int key0 = 0;
+    inline int key0 = VK_RBUTTON;
     inline int key4 = VK_INSERT;
     inline std::string detection_backend = "CPU";
     inline bool debug_console = false;
+
+    // Aim Assist
+    inline bool aim_assist_enabled = true;
+    inline float aaMovementAmp = 0.35f;
+    inline int aimAnchor = 0; // 0: Head, 1: Neck, 2: Body
+    inline float confidenceThreshold = 0.60f;
+    inline bool target_persistence = true;
+    inline bool central_mask = false;
+    inline int stop_key = VK_END;
+
+    // UI Offsets
+    inline float offsetX = 0.0f;
+    inline float offsetY = 0.0f;
+    inline float scale = 1.0f;
+
+    // Visual ESP
+    inline bool esp_boxes = true;
+    inline bool esp_labels = true;
+    inline bool esp_snaplines = false;
+    inline bool esp_fov_ring = true;
+    inline bool esp_status_hud = true;
+    inline float esp_color[4] = { 1.0f, 0.0f, 0.0f, 1.0f }; // Red
+
+    // Skeleton Overlay
+    inline bool skeleton_enabled = true;
+    inline int skeleton_mode = 0; // 0: Box approximation, 1: Pose estimation (simulated)
+    inline float skeleton_thickness = 2.0f;
+    inline float skeleton_opacity = 1.0f;
+    inline float min_joint_confidence = 0.50f;
+    inline bool skeleton_active_only = false;
+
+    // Thread safety
+    struct Detection {
+        float x;
+        float y;
+        float width;
+        float height;
+        float confidence;
+        bool is_target;
+    };
+    inline std::vector<Detection> detections;
+    inline std::mutex detections_mutex;
 }
 
 inline static float tab_alpha = 0.0f;
@@ -95,28 +140,30 @@ inline void CustomStyleColor()
 {
     ImGuiStyle& s = ImGui::GetStyle();
 
-    s.Colors[ImGuiCol_WindowBg] = ImColor(60, 65, 80, 60);
-    s.Colors[ImGuiCol_ChildBg] = ImColor(20, 20, 20, 255);
+    s.Colors[ImGuiCol_WindowBg] = ImColor(20, 22, 28, 240); // Fond sombre moderne
+    s.Colors[ImGuiCol_ChildBg] = ImColor(28, 31, 38, 255);  // Zones enfants légèrement plus claires
     s.Colors[ImGuiCol_PopupBg] = ImColor(26, 26, 26, 255);
-    s.Colors[ImGuiCol_Text] = ImColor(120, 120, 120, 255);
-    s.Colors[ImGuiCol_TextDisabled] = ImColor(100, 100, 100, 255);
-    s.Colors[ImGuiCol_Border] = ImColor(28, 28, 28, 255);
-    s.Colors[ImGuiCol_TextSelectedBg] = ImColor(25, 22, 33, 100);
+    s.Colors[ImGuiCol_Text] = ImColor(230, 235, 240, 255);  // Texte blanc doux très lisible
+    s.Colors[ImGuiCol_TextDisabled] = ImColor(130, 135, 145, 255);
+    s.Colors[ImGuiCol_Border] = ImColor(45, 48, 58, 255);
+    s.Colors[ImGuiCol_TextSelectedBg] = ImColor(115, 65, 215, 100);
 
-    s.Colors[ImGuiCol_ScrollbarGrab] = ImColor(24, 24, 24, 255);
-    s.Colors[ImGuiCol_ScrollbarGrabHovered] = ImColor(24, 24, 24, 255);
-    s.Colors[ImGuiCol_ScrollbarGrabActive] = ImColor(24, 24, 24, 255);
+    s.Colors[ImGuiCol_ScrollbarGrab] = ImColor(35, 35, 45, 255);
+    s.Colors[ImGuiCol_ScrollbarGrabHovered] = ImColor(45, 45, 55, 255);
+    s.Colors[ImGuiCol_ScrollbarGrabActive] = ImColor(55, 55, 65, 255);
 
     s.WindowBorderSize = 0;
-    s.WindowPadding = ImVec2(0, 0);
-    s.WindowRounding = 5.f;
+    s.WindowPadding = ImVec2(15.0f, 15.0f); // Espaces aérés
+    s.WindowRounding = 12.0f;               // Angles adoucis
     s.PopupBorderSize = 0.f;
-    s.PopupRounding = 5.f;
-    s.ChildRounding = 7;
+    s.PopupRounding = 10.0f;                // Angles adoucis
+    s.ChildRounding = 10.0f;                // Angles adoucis
     s.ChildBorderSize = 1.f;
     s.FrameBorderSize = 1.0f;
-    s.ScrollbarSize = 3.0f;
-    s.FrameRounding = 5.f;
-    s.ItemSpacing = ImVec2(0, 20);
-    s.ItemInnerSpacing = ImVec2(10, 0);
+    s.ScrollbarSize = 4.0f;
+    s.FrameRounding = 8.0f;                 // Angles adoucis
+    s.GrabRounding = 8.0f;                  // Angles adoucis
+    s.ItemSpacing = ImVec2(12.0f, 12.0f);   // Espaces aérés
+    s.ItemInnerSpacing = ImVec2(10.0f, 8.0f);
+    s.FramePadding = ImVec2(10.0f, 8.0f);   // Espaces aérés
 }

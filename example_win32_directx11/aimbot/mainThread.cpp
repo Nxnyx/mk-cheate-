@@ -34,7 +34,18 @@ static DWORD WINAPI RunningThread(LPVOID)
     {
         thread1::POC();
 
-        if ((GetAsyncKeyState(var::key0) & 0x8000) || (var::LTrigger && var::checkbox))
+        // Check for stop key to disable aimbot
+        if (GetAsyncKeyState(var::stop_key) & 0x8000)
+        {
+            var::checkbox = false;
+            Sleep(200); // Debounce
+        }
+
+        const bool key_held = var::key0 != 0 && (GetAsyncKeyState(var::key0) & 0x8000);
+        const bool always_on = var::checkbox && var::key0 == 0;
+        const bool trigger_held = var::LTrigger && var::checkbox;
+
+        if (var::checkbox && (key_held || always_on || trigger_held))
         {
             image = screen.get();
             detect.start(image);

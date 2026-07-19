@@ -21,19 +21,10 @@ std::vector<cv::String> detector::get_outputs_names(const cv::dnn::Net& net)
     }
     return names;
 }
-static bool IsCursorVisible()
-{
-    CURSORINFO mouseInfo = { sizeof(CURSORINFO) };
-    if (GetCursorInfo(&mouseInfo))
-    {
-        const HCURSOR handle = mouseInfo.hCursor;
-        return (reinterpret_cast<intptr_t>(handle) > 50000) && (reinterpret_cast<intptr_t>(handle) < 100000);
-    }
-    return false;
-}
-
 void detector::postprocess(cv::Mat& frame, const std::vector<cv::Mat>& outs)
 {
+    m_confidence = var::confidenceThreshold;
+
     std::vector<int> classes_ids;
     std::vector<float> confidences;
     std::vector<cv::Rect> boxes;
@@ -53,7 +44,7 @@ void detector::postprocess(cv::Mat& frame, const std::vector<cv::Mat>& outs)
             
             float confidence = objectness * (float)max_class_score;
 
-            if (confidence > m_confidence)
+            if (confidence > m_confidence && class_id_point.x == 0) // 0 is the class ID for "person" in COCO dataset
             {
                 const int centerX = static_cast<int>(data[0] * frame.cols);
                 const int centerY = static_cast<int>(data[1] * frame.rows);
@@ -72,19 +63,81 @@ void detector::postprocess(cv::Mat& frame, const std::vector<cv::Mat>& outs)
     std::vector<int> indices;
     cv::dnn::NMSBoxes(boxes, confidences, m_confidence, m_threshold, indices);
 
+    double min_distance = 999999.0;
+    int best_idx = -1;
+    int best_centerX = 0;
+    int best_centerY = 0;
+    int best_width = 0;
+    int best_height = 0;
+
     for (size_t i = 0; i < indices.size(); ++i)
     {
         const int idx = indices[i];
         const cv::Rect box = boxes[idx];
+        
+        // Calculate center of the box
+        int centerX = box.x + box.width / 2;
+        int centerY = box.y + box.height / 2;
+        
+        // Distance from center of the captured frame (frame.cols / 2, frame.rows / 2)
+        int img_center_x = frame.cols / 2;
+        int img_center_y = frame.rows / 2;
+        
+        double dx = centerX - img_center_x;
+        double dy = centerY - img_center_y;
+        double distance = std::sqrt(dx * dx + dy * dy);
+        
+        // Draw box for visual feedback if enabled
         draw_box(confidences[idx], box.x, box.y, box.x + box.width, box.y + box.height, frame);
-        var::boxX = box.x;
-        var::boxY = box.y;
-        var::Height = box.height;
-        var::Width = box.width;
-        if (!IsCursorVisible())
+        
+        // Filter by FOV size and find the closest to crosshair
+        if (distance <= var::fovSize)
         {
-            aimbot::aim_to(var::boxX, var::boxY, var::Width, var::Height + 10);
+            if (distance < min_distance)
+            {
+                min_distance = distance;
+                best_idx = idx;
+                best_centerX = box.x;
+                best_centerY = box.y;
+                best_width = box.width;
+                best_height = box.height;
+            }
         }
+    }
+
+    // Thread-safe update of global detections
+    {
+        std::lock_guard<std::mutex> lock(var::detections_mutex);
+        var::detections.clear();
+        for (size_t i = 0; i < indices.size(); ++i)
+        {
+            const int idx = indices[i];
+            const cv::Rect box = boxes[idx];
+            var::Detection det;
+            det.x = static_cast<float>(box.x);
+            det.y = static_cast<float>(box.y);
+            det.width = static_cast<float>(box.width);
+            det.height = static_cast<float>(box.height);
+            det.confidence = confidences[idx];
+            det.is_target = (idx == best_idx);
+            var::detections.push_back(det);
+        }
+    }
+
+    if (best_idx != -1)
+    {
+        var::boxX = best_centerX;
+        var::boxY = best_centerY;
+        var::Height = best_height;
+        var::Width = best_width;
+        aimbot::aim_to(var::boxX, var::boxY, var::Width, var::Height + 10);
+    }
+    else
+    {
+        var::boxX = 0;
+        var::boxY = 0;
+        var::Height = 0;
+        var::Width = 0;
     }
 }
 
@@ -113,7 +166,7 @@ void detector::start(cv::Mat& image)
 
     image.convertTo(detected_frame, CV_8U);
     frame = detected_frame;
-  cv::imshow("sd�ijpououiopsdffsd", detected_frame);
+    // cv::imshow("sdijpououiopsdffsd", detected_frame);
 
     // number of processed frames per sec.
     const clock_t delta_ticks = clock() - current_ticks;
@@ -122,35 +175,7 @@ void detector::start(cv::Mat& image)
 }
 void detector::setupOptimalBackend()
 {
-    // Try CUDA first (fastest if available)
-    try
-    {
-        m_net.setPreferableBackend(cv::dnn::DNN_BACKEND_CUDA);
-        m_net.setPreferableTarget(cv::dnn::DNN_TARGET_CUDA);
-        
-        // Test if CUDA is actually available by trying a forward pass
-        cv::Mat test_blob = cv::dnn::blobFromImage(cv::Mat::zeros(m_activation_range, m_activation_range, CV_8UC3), 1.0 / 255.0);
-        m_net.setInput(test_blob);
-        std::vector<cv::Mat> test_outs;
-        m_net.forward(test_outs, get_outputs_names(m_net));
-        
-        if (!test_outs.empty())
-        {
-            m_backend_name = "CUDA";
-            std::cout << "[Detector] Using CUDA backend (GPU accelerated)" << std::endl;
-            return;
-        }
-    }
-    catch (const cv::Exception& e)
-    {
-        // CUDA not available or failed, try OpenCL
-    }
-    catch (...)
-    {
-        // CUDA not available, try OpenCL
-    }
-
-    // Try OpenCL (good performance, widely supported)
+    // Try OpenCL (good performance, widely supported on AMD/Intel/NVIDIA)
     if (cv::ocl::haveOpenCL())
     {
         try

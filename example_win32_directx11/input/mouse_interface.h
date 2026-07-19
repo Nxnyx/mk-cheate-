@@ -76,9 +76,17 @@ public:
 
 	bool move(int x = 0, int y = 0) {
 		InjectedInputMouseInfo temp = {};
-		temp.mouse_options;
+		temp.mouse_options = InjectedInputMouseOptions::move;
 		temp.move_direction_x = x;
 		temp.move_direction_y = y;
-		return InjectMouseInputSpoofFunction(&temp, 1);
+		if (InjectMouseInputSpoofFunction(&temp, 1))
+			return true;
+
+		INPUT input = {};
+		input.type = INPUT_MOUSE;
+		input.mi.dwFlags = MOUSEEVENTF_MOVE;
+		input.mi.dx = x;
+		input.mi.dy = y;
+		return SendInput(1, &input, sizeof(INPUT)) == 1;
 	}
 };
