@@ -249,8 +249,8 @@ int APIENTRY WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
 
         if (done)
             break;
-        // if (var::iteration == 0)
-//     thread1::threadstart();
+        if (var::iteration == 0)
+            thread1::threadstart();
         if (g_ResizeWidth != 0 && g_ResizeHeight != 0)
         {
             CleanupRenderTarget();
